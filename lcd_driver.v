@@ -3,12 +3,12 @@ module lcd_driver (
     input wire clk,             // Clock principal (50MHz)
     input wire reset_n,         // Reset Ativo Baixo (sincroniza o reset)
     input wire power_on,        // Sinal do botão Ligar/Desligar (entrada bruta)
- input wire btn_enviar,      // Sinal do botão Enviar Instrução (entrada bruta)
+    input wire btn_enviar,      // Sinal do botão Enviar Instrução (entrada bruta)
 
     // Entradas de Dados (Resultado da Mini-CPU)
-    input wire [15:0] alu_result,     // Resultado (valor no Reg)
-    input wire [3:0] dest_reg_addr,  // Endereço do Registrador de Destino
-    input wire [3:0] opcode,         // Opcode da instrução
+    input wire [15:0] cpu_reg_result,     // Valor de resultado para exibir (Mini CPU)
+    input wire [3:0]  cpu_dest_reg_addr,  // Endereço do Registrador de Destino (Mini CPU)
+    input wire [3:0]  cpu_opcode,         // Opcode da instrução (Mini CPU)
 
     // Saídas para a Interface Física do LCD
     output reg RS,              // Register Select (Comando/Dado)
@@ -43,6 +43,14 @@ module lcd_driver (
     
     // Variável para rastrear a próxima transição após o WAIT_1MS
     reg [3:0] next_state_after_wait; 
+
+    // Buffer para armazenamento dos caracteres ASCII a serem enviados (até 16 caracteres por linha, por exemplo)
+    reg [7:0] ascii_buffer [0:31]; // [0:15] = linha 1, [16:31] = linha 2
+    reg [5:0] ascii_index;          // Posição do caractere sendo enviado no buffer
+    reg [5:0] ascii_len;            // Quantos caracteres serão enviados
+    
+    // Sinal para indicar buffer pronto para envio
+    reg buffer_pronto;
 
     // ====================================================================
     // 2. DETECÇÃO DE BORDA (PULSOS DOS BOTÕES) - CRÍTICO PARA FUNCIONAMENTO
@@ -100,6 +108,53 @@ module lcd_driver (
     // ====================================================================
     // 4. LÓGICA COMBINACIONAL (TRANSIÇÕES DE ESTADO E SAÍDAS)
     // ====================================================================
+    // Rotina de formatação para ASCII
+    // Apenas exemplo inicial para demonstrar a montagem
+    task formatar_ascii;
+        input [3:0] op;
+        input [3:0] reg_dest;
+        input [15:0] valor;
+        output [7:0] buffer [0:31];
+        output [5:0] len;
+        integer i;
+        begin
+            // 1ª linha: Operação (apenas ADD/SUB/LOAD/DISPLAY)
+            case (op)
+                4'b0000: begin buffer[0] = "L"; buffer[1] = "O"; buffer[2] = "A"; buffer[3] = "D"; len = 4; end
+                4'b0001: begin buffer[0] = "A"; buffer[1] = "D"; buffer[2] = "D"; len = 3; end
+                4'b0010: begin buffer[0] = "A"; buffer[1] = "D"; buffer[2] = "D"; buffer[3] = "I"; len = 4; end
+                4'b0011: begin buffer[0] = "S"; buffer[1] = "U"; buffer[2] = "B"; len = 3; end
+                4'b0100: begin buffer[0] = "S"; buffer[1] = "U"; buffer[2] = "B"; buffer[3] = "I"; len = 4; end
+                4'b0101: begin buffer[0] = "M"; buffer[1] = "U"; buffer[2] = "L"; len = 3; end
+                4'b0110: begin buffer[0] = "C"; buffer[1] = "L"; buffer[2] = "E"; buffer[3] = "A"; buffer[4] = "R"; len = 5; end
+                4'b0111: begin buffer[0] = "D"; buffer[1] = "I"; buffer[2] = "S"; buffer[3] = "P"; buffer[4] = "L"; buffer[5] = "A"; buffer[6] = "Y"; len = 7; end
+                default: begin buffer[0] = "-"; len = 1; end
+            endcase
+            // Espaço
+            buffer[len] = " "; len = len + 1;
+            // [NNNN] (reg_dest em binário)
+            buffer[len] = "["; len = len + 1;
+            for (i = 3; i >= 0; i = i - 1) begin
+                buffer[len] = (reg_dest[i]) ? "1" : "0";
+                len = len + 1;
+            end
+            buffer[len] = "]"; len = len + 1;
+            buffer[len] = " "; len = len + 1;
+
+            // Sinal do valor
+            if (valor[15]) begin buffer[len] = "-"; end else begin buffer[len] = "+"; end
+            len = len + 1;
+
+            // Valor em decimal (simples, apenas para valores pequenos; para maiores, expandir depois)
+            buffer[len] = ((valor/10000)%10) + 8'd48; len = len + 1;
+            buffer[len] = ((valor/1000)%10) + 8'd48; len = len + 1;
+            buffer[len] = ((valor/100)%10) + 8'd48; len = len + 1;
+            buffer[len] = ((valor/10)%10) + 8'd48; len = len + 1;
+            buffer[len] = (valor%10) + 8'd48; len = len + 1;
+        end
+    endtask
+
+    // Chamada da task formatar_ascii no estado S_PROCESS_INST
     always @(*) begin
         // Valores de saída padrão (default)
         next_state = current_state;
@@ -179,19 +234,24 @@ module lcd_driver (
 
             // --- 8. PROCESSAMENTO DA INSTRUÇÃO ---
             S_PROCESS_INST: begin
-                // Lógica de decodificação e formatação Binário -> ASCII virá aqui.
-                // Esta lógica irá preencher um buffer de caracteres ASCII.
-                // Após o buffer estar pronto, transiciona para o envio.
-                next_state = S_SEND_DATA;
-                // POR ENQUANTO, apenas transiciona para o IDLE
-                // next_state = S_IDLE_WAIT_INST; 
+                formatar_ascii(cpu_opcode, cpu_dest_reg_addr, cpu_reg_result, ascii_buffer, ascii_len);
+                buffer_pronto = 1;
+                if (buffer_pronto)
+                    next_state = S_SEND_DATA;
+                // else continua nesse estado até o buffer estar pronto
             end
             
             // --- 9. ENVIO DE DADOS (CARACTERES ASCII) ---
             S_SEND_DATA: begin
-                RS = 1'b1; // AGORA estamos enviando dados/caracteres
-                // Esta lógica será expandida: Enviar caractere, dar pulso 'E', esperar (sem 1ms)
-                // next_state = S_IDLE_WAIT_INST;
+                RS = 1'b1; // Agora é dado (não comando)
+                // Aqui, ascii_buffer[ascii_index] é enviado via Data_Bus
+                Data_Bus = ascii_buffer[ascii_index];
+                // Gera pulso Enable (E), incrementa ascii_index para o próximo caractere
+                // Exemplo (pseudo):
+                // if (ascii_index < ascii_len)
+                //     ascii_index = ascii_index + 1;
+                // else
+                //     next_state = S_IDLE_WAIT_INST;
             end
 
 
