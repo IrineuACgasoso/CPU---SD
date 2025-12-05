@@ -3,7 +3,7 @@ module lcd_driver (
     input wire clk,             // Clock principal (50MHz)
     input wire reset_n,         // Reset Ativo Baixo (sincroniza o reset)
     input wire power_on,        // Sinal do botão Ligar/Desligar (entrada bruta)
-    input wire btn_enviar,      // Sinal do botão Enviar Instrução (entrada bruta)
+ input wire btn_enviar,      // Sinal do botão Enviar Instrução (entrada bruta)
 
     // Entradas de Dados (Resultado da Mini-CPU)
     input wire [15:0] alu_result,     // Resultado (valor no Reg)
