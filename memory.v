@@ -6,8 +6,8 @@ module memory (
     input wire [3:0] addr_read1,       // Leitura 1
     input wire [3:0] addr_read2,       // Leitura 2
     input wire [15:0] data_in,         // Dados de escrita
-    output reg [15:0] data_out1,       // Saída leitura 1
-    output reg [15:0] data_out2        // Saída leitura 2
+    output wire [15:0] data_out1,      // Saída leitura 1 (assíncrona)
+    output wire [15:0] data_out2       // Saída leitura 2 (assíncrona)
 );
 
     reg [15:0] mem [15:0]; // 16 registradores de 16 bits
@@ -22,9 +22,8 @@ module memory (
         end
     end
 
-    always @(posedge clk) begin
-        data_out1 <= mem[addr_read1];
-        data_out2 <= mem[addr_read2];
-    end
+    // Leituras assíncronas
+    assign data_out1 = mem[addr_read1];
+    assign data_out2 = mem[addr_read2];
 
 endmodule

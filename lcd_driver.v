@@ -102,47 +102,46 @@ module lcd_driver (
     end
 
     // LÓGICA COMBINACIONAL (TRANSIÇÕES DE ESTADO E SAÍDAS)
-    // Rotina de formatação para ASCII
+    // Rotina de formatação para ASCII (estilo Verilog-2001: escreve direto no ascii_buffer)
     task formatar_ascii;
         input [3:0] op;
         input [3:0] reg_dest;
         input [15:0] valor;
-        output [7:0] buffer [0:31];
-        output [5:0] len;
         integer i;
         begin
+            ascii_len = 0;
             // 1ª linha: Operação (apenas ADD/SUB/LOAD/DISPLAY)
             case (op)
-                4'b0000: begin buffer[0] = "L"; buffer[1] = "O"; buffer[2] = "A"; buffer[3] = "D"; len = 4; end
-                4'b0001: begin buffer[0] = "A"; buffer[1] = "D"; buffer[2] = "D"; len = 3; end
-                4'b0010: begin buffer[0] = "A"; buffer[1] = "D"; buffer[2] = "D"; buffer[3] = "I"; len = 4; end
-                4'b0011: begin buffer[0] = "S"; buffer[1] = "U"; buffer[2] = "B"; len = 3; end
-                4'b0100: begin buffer[0] = "S"; buffer[1] = "U"; buffer[2] = "B"; buffer[3] = "I"; len = 4; end
-                4'b0101: begin buffer[0] = "M"; buffer[1] = "U"; buffer[2] = "L"; len = 3; end
-                4'b0110: begin buffer[0] = "C"; buffer[1] = "L"; buffer[2] = "E"; buffer[3] = "A"; buffer[4] = "R"; len = 5; end
-                4'b0111: begin buffer[0] = "D"; buffer[1] = "I"; buffer[2] = "S"; buffer[3] = "P"; buffer[4] = "L"; buffer[5] = "A"; buffer[6] = "Y"; len = 7; end
-                default: begin buffer[0] = "-"; len = 1; end
+                4'b0000: begin ascii_buffer[0] = "L"; ascii_buffer[1] = "O"; ascii_buffer[2] = "A"; ascii_buffer[3] = "D"; ascii_len = 4; end
+                4'b0001: begin ascii_buffer[0] = "A"; ascii_buffer[1] = "D"; ascii_buffer[2] = "D"; ascii_len = 3; end
+                4'b0010: begin ascii_buffer[0] = "A"; ascii_buffer[1] = "D"; ascii_buffer[2] = "D"; ascii_buffer[3] = "I"; ascii_len = 4; end
+                4'b0011: begin ascii_buffer[0] = "S"; ascii_buffer[1] = "U"; ascii_buffer[2] = "B"; ascii_len = 3; end
+                4'b0100: begin ascii_buffer[0] = "S"; ascii_buffer[1] = "U"; ascii_buffer[2] = "B"; ascii_buffer[3] = "I"; ascii_len = 4; end
+                4'b0101: begin ascii_buffer[0] = "M"; ascii_buffer[1] = "U"; ascii_buffer[2] = "L"; ascii_len = 3; end
+                4'b0110: begin ascii_buffer[0] = "C"; ascii_buffer[1] = "L"; ascii_buffer[2] = "E"; ascii_buffer[3] = "A"; ascii_buffer[4] = "R"; ascii_len = 5; end
+                4'b0111: begin ascii_buffer[0] = "D"; ascii_buffer[1] = "I"; ascii_buffer[2] = "S"; ascii_buffer[3] = "P"; ascii_buffer[4] = "L"; ascii_buffer[5] = "A"; ascii_buffer[6] = "Y"; ascii_len = 7; end
+                default: begin ascii_buffer[0] = "-"; ascii_len = 1; end
             endcase
-            // Espaço
-            buffer[len] = " "; len = len + 1;
-            buffer[len] = "["; len = len + 1;
+            // Espaço + reg destino em binário
+            ascii_buffer[ascii_len] = " "; ascii_len = ascii_len + 1;
+            ascii_buffer[ascii_len] = "["; ascii_len = ascii_len + 1;
             for (i = 3; i >= 0; i = i - 1) begin
-                buffer[len] = (reg_dest[i]) ? "1" : "0";
-                len = len + 1;
+                ascii_buffer[ascii_len] = (reg_dest[i]) ? "1" : "0";
+                ascii_len = ascii_len + 1;
             end
-            buffer[len] = "]"; len = len + 1;
-            buffer[len] = " "; len = len + 1;
+            ascii_buffer[ascii_len] = "]"; ascii_len = ascii_len + 1;
+            ascii_buffer[ascii_len] = " "; ascii_len = ascii_len + 1;
 
             // Sinal do valor
-            if (valor[15]) begin buffer[len] = "-"; end else begin buffer[len] = "+"; end
-            len = len + 1;
+            if (valor[15]) ascii_buffer[ascii_len] = "-"; else ascii_buffer[ascii_len] = "+";
+            ascii_len = ascii_len + 1;
 
-            // Valor em decimal (simples, apenas para valores pequenos)
-            buffer[len] = ((valor/10000)%10) + 8'd48; len = len + 1;
-            buffer[len] = ((valor/1000)%10) + 8'd48; len = len + 1;
-            buffer[len] = ((valor/100)%10) + 8'd48; len = len + 1;
-            buffer[len] = ((valor/10)%10) + 8'd48; len = len + 1;
-            buffer[len] = (valor%10) + 8'd48; len = len + 1;
+            // Valor em decimal (simples, 5 dígitos)
+            ascii_buffer[ascii_len] = ((valor/10000)%10) + 8'd48; ascii_len = ascii_len + 1;
+            ascii_buffer[ascii_len] = ((valor/1000)%10)  + 8'd48; ascii_len = ascii_len + 1;
+            ascii_buffer[ascii_len] = ((valor/100)%10)   + 8'd48; ascii_len = ascii_len + 1;
+            ascii_buffer[ascii_len] = ((valor/10)%10)    + 8'd48; ascii_len = ascii_len + 1;
+            ascii_buffer[ascii_len] = (valor%10)         + 8'd48; ascii_len = ascii_len + 1;
         end
     endtask
 
@@ -224,7 +223,7 @@ module lcd_driver (
 
             // PROCESSAMENTO DA INSTRUÇÃO 
             S_PROCESS_INST: begin
-                formatar_ascii(cpu_opcode, cpu_dest_reg_addr, cpu_reg_result, ascii_buffer, ascii_len);
+                formatar_ascii(cpu_opcode, cpu_dest_reg_addr, cpu_reg_result);
                 buffer_pronto = 1;
                 if (buffer_pronto)
                     next_state = S_SEND_DATA;
