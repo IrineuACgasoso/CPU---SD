@@ -1,0 +1,15 @@
+-- begin_signature
+-- lcd_init_hd44780
+-- end_signature
+WIDTH=8;
+DEPTH=4;
+
+ADDRESS_RADIX=UNS;
+DATA_RADIX=BIN;
+
+CONTENT BEGIN
+	3 :	00000110;
+	2 :	00000001;
+	1 :	00001100;
+	0 :	00111000;
+END;

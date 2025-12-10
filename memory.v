@@ -1,29 +1,31 @@
 module memory (
-    input wire clk,
-    input wire reset_n,
-    input wire we,                     // Habilita escrita
-    input wire [3:0] addr_write,
-    input wire [3:0] addr_read1,       // Leitura 1
-    input wire [3:0] addr_read2,       // Leitura 2
-    input wire [15:0] data_in,         // Dados de escrita
-    output wire [15:0] data_out1,      // Saída leitura 1 (assíncrona)
-    output wire [15:0] data_out2       // Saída leitura 2 (assíncrona)
+    input  wire        clk,
+    input  wire        rst,       // Reset (zera a memória)
+    input  wire        we,        // Write Enable
+    input  wire [3:0]  addr_wr,   // Endereço de escrita
+    input  wire [3:0]  addr_rd1,  // Endereço de leitura 1
+    input  wire [3:0]  addr_rd2,  // Endereço de leitura 2
+    input  wire [15:0] data_in,   // Dado a escrever
+    output wire [15:0] data_out1, // Dado lido 1
+    output wire [15:0] data_out2  // Dado lido 2
 );
 
-    reg [15:0] mem [15:0]; // 16 registradores de 16 bits
+    reg [15:0] RAM [0:15];
     integer i;
 
-    always @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            for (i = 0; i < 16; i = i + 1)
-                mem[i] <= 16'd0;
+    // Leitura Assíncrona (dados disponíveis imediatamente)
+    assign data_out1 = RAM[addr_rd1];
+    assign data_out2 = RAM[addr_rd2];
+
+    // Escrita Síncrona com Reset
+    always @(posedge clk) begin
+        if (rst) begin
+            for (i = 0; i < 16; i = i + 1) begin
+                RAM[i] <= 16'd0;
+            end
         end else if (we) begin
-            mem[addr_write] <= data_in;
+            RAM[addr_wr] <= data_in;
         end
     end
-
-    // Leituras assíncronas
-    assign data_out1 = mem[addr_read1];
-    assign data_out2 = mem[addr_read2];
 
 endmodule

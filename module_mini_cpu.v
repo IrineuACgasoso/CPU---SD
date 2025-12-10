@@ -1,180 +1,131 @@
-module module_mini_cpu #(
-    parameter FAST_SIM = 1'b0  // Usa delays reduzidos no LCD para simulação
-)(
-    input  wire        clk,           // 50 MHz
-    input  wire        reset_n,       // Reset global ativo baixo (KEY[0])
-    input  wire        power_on,      // Botão de ligar/desligar (para LCD)
-    input  wire        btn_enviar,    // Botão de envio da instrução (KEY[1], debounced internamente)
-    input  wire [17:0] instrucao,     // SW[17:0]
-
-    // Interface para LCD (driver)
-    output wire        LCD_RS,
-    output wire        LCD_EN,
-    output wire        LCD_RW,
-    output wire [7:0]  LCD_DATA,
-    output wire        LCD_ON,
-    output wire        LCD_BLON
+module module_mini_cpu (
+    input  wire        clk,
+    input  wire        rst,         // Botão KEY[0] (reset)
+    input  wire        send_btn,    // Botão KEY[1] (Enviar)
+    input  wire [17:0] switches,    // Instrução
+    
+    // Interface LCD
+    output reg         lcd_update,
+    output reg [2:0]   lcd_opcode,
+    output reg [3:0]   lcd_reg_idx,
+    output reg [15:0]  lcd_value,
+    input  wire        lcd_busy
 );
 
-    // Evita aviso de sinal não utilizado (power_on apenas repassado ao LCD)
-    wire unused_power_on = power_on;
+    // --- Decodificação dos Switches ---
+    wire [2:0] opcode = switches[17:15];
+    wire [3:0] r_dest = switches[14:11]; // Destino (onde grava)
+    wire [3:0] r_src1 = switches[10:7];  // Fonte 1 (Operand A)
+    wire [3:0] r_src2 = switches[6:3];   // Fonte 2 (Operand B - Reg)
+    wire [6:0] imm7   = switches[6:0];   // Imediato pequeno (ADDI, SUBI)
+    wire [10:0] imm11 = switches[10:0];  // Imediato grande (LOAD)
 
-    // ------------------------------------------------------------
-    // FSM de controle simples:
-    // IDLE    : espera borda do botão Enviar
-    // EXECUTE : decodifica instrução latched, seleciona operando/imediato e calcula na ULA
-    // STORE   : grava resultado na memória (exceto DISPLAY/CLEAR)
-    // LCD     : atualiza registradores de saída para o driver LCD
-    // Depois retorna a IDLE
-    // ------------------------------------------------------------
-    localparam S_IDLE    = 2'd0;
-    localparam S_EXECUTE = 2'd1;
-    localparam S_STORE   = 2'd2;
-    localparam S_LCD     = 2'd3;
+    // --- Sinais Internos ---
+    reg mem_we;
+    reg [15:0] mem_data_wr;
+    wire [15:0] mem_out1, mem_out2;
+    
+    reg [15:0] alu_in_a, alu_in_b;
+    wire signed [15:0] alu_result;
 
-    reg [1:0] state, next_state;
-
-    // ------------------------------------------------------------
-    // Debounce simples / detecção de borda de subida do botão Enviar (ativo alto)
-    // ------------------------------------------------------------
-    reg [2:0] btn_sync;
-    always @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            btn_sync <= 3'b000;
-        end else begin
-            btn_sync <= {btn_sync[1:0], btn_enviar};
-        end
-    end
-    wire btn_rise = (btn_sync[2:1] == 2'b01);
-
-    // ------------------------------------------------------------
-    // Latch da instrução ao apertar o botão (captura SW[17:0] em instr_reg)
-    // ------------------------------------------------------------
-    reg [17:0] instr_reg;
-    // Campos da instrução (formato Reg-Reg ou Imediato)
-    wire [2:0] opcode     = instr_reg[17:15]; // operação
-    wire [3:0] reg_dest   = instr_reg[14:11];
-    wire [3:0] reg_src1   = instr_reg[10:7];
-    wire [3:0] reg_src2   = instr_reg[3:0];
-    wire       is_immediate = (opcode == 3'b010) || (opcode == 3'b100) || (opcode == 3'b000); // ADDI, SUBI, LOAD usam imediato
-
-    // Imediato com sinal: bits [6] (sinal) + [5:0] (valor). Extensão de sinal para 16 bits.
-    wire [6:0]  imm7    = instr_reg[6:0];
-    wire [15:0] imm_ext = {{9{imm7[6]}}, imm7};
-
-    // ------------------------------------------------------------
-    // Ligações com memória e ULA
-    // ------------------------------------------------------------
-    // Memória interna (endereços e dados)
-    wire [3:0] mem_addr_read1 = reg_src1;
-    wire [3:0] mem_addr_read2 = is_immediate ? 4'd0 : reg_src2;
-    wire [3:0] mem_addr_write = reg_dest;
-    wire [15:0] mem_data_in   = alu_result;
-    wire [15:0] mem_data_out1;
-    wire [15:0] mem_data_out2;
-    wire        mem_we;
-
-    // Operandos para a ULA (A=mem_data_out1, B=mem_data_out2 ou imediato)
-    wire [15:0] alu_in1 = mem_data_out1;
-    wire [15:0] alu_in2 = is_immediate ? imm_ext : mem_data_out2;
-    wire [3:0]  alu_op  = {1'b0, opcode}; // exportado para debug
-    wire [15:0] alu_result;
-
-    // Memória: escrita somente no estado STORE (exceto DISPLAY 111 / CLEAR 110)
-    wire will_write = (opcode != 3'b111) && (opcode != 3'b110);
-    assign mem_we = (state == S_STORE) && will_write;
-
-    // CLEAR: força reset dos registradores na memória (pulso de reset_n baixo durante EXECUTE do opcode CLEAR)
-    wire mem_reset_n = reset_n & ~((state == S_EXECUTE) && (opcode == 3'b110));
-
-    // ------------------------------------------------------------
-    // Registradores repassados ao driver LCD (valor, registrador de destino, opcode)
-    // ------------------------------------------------------------
-    reg [15:0] reg_result;
-    reg [3:0]  reg_dest_addr;
-    reg [3:0]  reg_opcode;
-
-    // ------------------------------------------------------------
-    // Sequencial da FSM
-    // ------------------------------------------------------------
-    always @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            state         <= S_IDLE;
-            instr_reg     <= 18'd0;
-            reg_result    <= 16'd0;
-            reg_dest_addr <= 4'd0;
-            reg_opcode    <= 4'd0;
-        end else begin
-            state <= next_state;
-
-            // Latch da instrução na transição IDLE -> EXECUTE
-            if (state == S_IDLE && btn_rise) begin
-                instr_reg <= instrucao;
-            end
-
-            // Atualiza sinais para o LCD na saída do STORE -> LCD
-            if (state == S_LCD) begin
-                reg_result    <= (opcode == 3'b110) ? 16'd0 : alu_result; // CLEAR mostra zero
-                reg_dest_addr <= reg_dest;
-                reg_opcode    <= {1'b0, opcode};
-            end
-        end
-    end
-
-    // ------------------------------------------------------------
-    // Combinacional da FSM
-    // ------------------------------------------------------------
-    always @(*) begin
-        next_state = state;
-        case (state)
-            S_IDLE:    next_state = btn_rise ? S_EXECUTE : S_IDLE;
-            S_EXECUTE: next_state = S_STORE;
-            S_STORE:   next_state = S_LCD;
-            S_LCD:     next_state = S_IDLE;
-            default:   next_state = S_IDLE;
-        endcase
-    end
-
-    // ------------------------------------------------------------
-    // Instâncias: memória, ULA e driver LCD (lcd_driver.v existente)
-    // ------------------------------------------------------------
+    // --- Instâncias ---
     memory mem_inst (
-        .clk        (clk),
-        .reset_n    (mem_reset_n),
-        .we         (mem_we),
-        .addr_write (mem_addr_write),
-        .addr_read1 (mem_addr_read1),
-        .addr_read2 (mem_addr_read2),
-        .data_in    (mem_data_in),
-        .data_out1  (mem_data_out1),
-        .data_out2  (mem_data_out2)
+        .clk(clk), .rst(rst), .we(mem_we), 
+        .addr_wr(r_dest), .data_in(mem_data_wr),
+        .addr_rd1(r_src1), .addr_rd2(r_src2),
+        .data_out1(mem_out1), .data_out2(mem_out2)
     );
 
     module_alu alu_inst (
-        .A      (alu_in1),
-        .B      (alu_in2),
-        .Opcode (opcode),
-        .Result (alu_result),
-        .Zero   ()
+        .opcode(opcode), .A(alu_in_a), .B(alu_in_b), .result(alu_result)
     );
 
-    // Reutiliza o driver já presente (lcd_driver.v)
-    lcd_driver lcd_inst (
-        .clk              (clk),
-        .reset_n          (reset_n),
-        .power_on         (power_on),
-        .btn_enviar       (btn_enviar),
-        .cpu_reg_result   (reg_result),
-        .cpu_dest_reg_addr(reg_dest_addr),
-        .cpu_opcode       (reg_opcode),
-        .RS               (LCD_RS),
-        .RW               (LCD_RW),
-        .E                (LCD_EN),
-        .Data_Bus         (LCD_DATA)
-    );
+    // Detector de borda do botão (Soltar o botão)
+    reg btn_prev;
+    wire btn_released = (btn_prev == 1'b0 && send_btn == 1'b1);
+    always @(posedge clk) btn_prev <= send_btn;
 
-    // LCD sempre ligado na placa
-    assign LCD_ON   = 1'b1;
-    assign LCD_BLON = 1'b1;
+    // --- Máquina de Estados (FSM) ---
+    // Adicionado estado S_LATCH para estabilizar dados
+    localparam S_WAIT_BTN = 0, S_EXECUTE = 1, S_LATCH = 2, S_UPDATE_LCD = 3, S_WAIT_LCD = 4;
+    reg [2:0] state;
 
+    always @(posedge clk) begin
+        if (rst) begin
+            state <= S_WAIT_BTN;
+            mem_we <= 0;
+            lcd_update <= 0;
+            alu_in_a <= 0; 
+            alu_in_b <= 0;
+        end else begin
+            case (state)
+                // 1. Espera usuário soltar botão enviar
+                S_WAIT_BTN: begin
+                    mem_we <= 0;
+                    lcd_update <= 0;
+                    if (btn_released && !lcd_busy) begin
+                        state <= S_EXECUTE;
+                    end
+                end
+
+                // 2. Configura as entradas da ALU (Ainda não temos o resultado)
+                S_EXECUTE: begin
+                    case (opcode)
+                        3'b000: begin // LOAD
+                            alu_in_a <= 0; 
+                            alu_in_b <= {{5{imm11[10]}}, imm11}; // Extensão de sinal
+                        end
+                        3'b001, 3'b011, 3'b101: begin // ADD, SUB, MUL (Reg, Reg)
+                            alu_in_a <= mem_out1; 
+                            alu_in_b <= mem_out2;
+                        end
+                        3'b010, 3'b100: begin // ADDI, SUBI (Reg, Imm)
+                            alu_in_a <= mem_out1; 
+                            alu_in_b <= {{9{imm7[6]}}, imm7};
+                        end
+                        3'b110: begin // CLEAR
+                             alu_in_a <= 0; alu_in_b <= 0;
+                        end
+                        3'b111: begin // DISPLAY (Lê valor do Reg)
+                            // Para mostrar o valor, passamos ele pela ALU (A + 0)
+                            alu_in_a <= mem_out1; 
+                            alu_in_b <= 0;
+                        end
+                        default: begin alu_in_a <= 0; alu_in_b <= 0; end
+                    endcase
+                    state <= S_LATCH;
+                end
+
+                // 3. NOVO ESTADO: O resultado da ALU agora é válido.
+                //    Aqui salvamos na memória e capturamos o valor para o LCD.
+                S_LATCH: begin
+                    // Escreve na memória (se não for DISPLAY)
+                    if (opcode != 3'b111) begin
+                        mem_we <= 1;
+                        mem_data_wr <= alu_result;
+                    end
+
+                    // Prepara dados para o LCD
+                    lcd_opcode  <= opcode;
+                    lcd_reg_idx <= r_dest; 
+                    lcd_value   <= alu_result; // Agora alu_result contém o valor calculado no ciclo anterior
+                    
+                    state <= S_UPDATE_LCD;
+                end
+
+                // 4. Manda o pulso para o controlador do LCD
+                S_UPDATE_LCD: begin
+                    mem_we <= 0;     // Para de escrever na memória
+                    lcd_update <= 1; // Avisa o LCD: "Pode desenhar"
+                    state <= S_WAIT_LCD;
+                end
+
+                // 5. Espera o LCD terminar
+                S_WAIT_LCD: begin
+                    lcd_update <= 0;
+                    if (!lcd_busy) state <= S_WAIT_BTN;
+                end
+            endcase
+        end
+    end
 endmodule

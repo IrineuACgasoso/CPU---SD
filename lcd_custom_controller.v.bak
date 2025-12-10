@@ -1,0 +1,233 @@
+module lcd_custom_controller (
+    input  wire        clk,
+    input  wire        rst,
+    
+    // --- Novos Sinais para conectar na CPU ---
+    input  wire        update_req,    // Pulso vindo da CPU avisando: "Escreva agora!"
+    input  wire [2:0]  opcode_in,     // Ex: 001 (ADD)
+    input  wire [3:0]  reg_idx_in,    // Ex: 0010 (R2)
+    input  wire signed [15:0] value_in, // Ex: 10 (Resultado)
+    output reg         busy,          // Avisa a CPU: "Estou ocupado escrevendo"
+
+    // --- Saídas Físicas para o LCD ---
+    output wire [7:0] lcd_data,
+    output wire       lcd_rs,
+    output wire       lcd_rw,
+    output wire       lcd_e
+);
+
+    // =======================================================================
+    // Instância do Inicializador (Manteve a lógica original)
+    // =======================================================================
+    wire init_done;
+    reg  start_init;
+    wire [7:0] init_data;
+    wire init_rs, init_rw, init_e;
+
+    lcd_init_hd44780 lcd_init (
+        .clk(clk), .rst(rst), .start(start_init), .done(init_done),
+        .lcd_data(init_data), .lcd_rs(init_rs), .lcd_rw(init_rw), .lcd_e(init_e)
+    );
+
+    // MUX para decidir quem controla os pinos
+    // Se inicialização não acabou, lcd_init controla. Se acabou, nós controlamos.
+    reg [7:0] wr_data;
+    reg wr_rs, wr_e;
+    
+    assign lcd_data = (init_done) ? wr_data : init_data;
+    assign lcd_rs   = (init_done) ? wr_rs   : init_rs;
+    assign lcd_rw   = 1'b0; // Sempre escrita
+    assign lcd_e    = (init_done) ? wr_e    : init_e;
+
+    // =======================================================================
+    // Lógica de Formatação da Mensagem
+    // =======================================================================
+    reg [7:0] line_buffer [0:31]; // Buffer para armazenar os 32 caracteres (16x2)
+    reg [15:0] abs_val;
+    reg [3:0]  thou, hund, tens, ones, ten_thou; 
+    integer i;
+
+    // Função auxiliar para converter Opcode em Texto
+    function [39:0] get_op_str; 
+        input [2:0] op;
+        case(op)
+            3'b000: get_op_str = "LOAD ";
+            3'b001: get_op_str = "ADD  ";
+            3'b010: get_op_str = "ADDI ";
+            3'b011: get_op_str = "SUB  ";
+            3'b100: get_op_str = "SUBI ";
+            3'b101: get_op_str = "MUL  ";
+            3'b110: get_op_str = "CLEAR";
+            3'b111: get_op_str = "DSPLY";
+            default: get_op_str = "UNK  ";
+        endcase
+    endfunction
+    reg [39:0] op_string;
+
+    // =======================================================================
+    // Máquina de Estados Principal
+    // =======================================================================
+    localparam S_IDLE       = 0,
+               S_FORMAT     = 1, // Prepara os caracteres
+               S_CMD_CLEAR  = 2, // Limpa a tela antes de escrever
+               S_WAIT_CMD   = 3, 
+               S_WRITE_CHAR = 4, // Loop de escrita
+               S_PULSE_EN   = 5, // Gera pulso de enable
+               S_WAIT_WR    = 6; // Espera lcd processar char
+
+    reg [3:0] state;
+    reg [31:0] delay_cnt;
+    reg [5:0] char_ptr; // Ponteiro (0 a 31)
+
+    // Delays (Assumindo 50MHz)
+    localparam D_PULSE = 32'd50;     // ~1us
+    localparam D_CHAR  = 32'd2500;   // ~50us
+    localparam D_CLEAR = 32'd100000; // ~2ms (Limpar tela demora mais)
+
+    always @(posedge clk or posedge rst) begin
+        if (rst) begin
+            state <= S_IDLE;
+            start_init <= 0;
+            busy <= 1;
+            wr_e <= 0;
+            char_ptr <= 0;
+        end else begin
+            // 1. Controle do start da inicialização
+            if (!start_init && !init_done) start_init <= 1;
+
+            case (state)
+                S_IDLE: begin
+                    wr_e <= 0;
+                    if (init_done) begin
+                        busy <= 0; // Libera a CPU para mandar coisa nova
+                        if (update_req) begin
+                            busy <= 1; // Trava
+                            state <= S_FORMAT;
+                        end
+                    end
+                end
+
+                // -----------------------------------------------------------
+                // Estado: Formatar a string baseada nos inputs da CPU
+                // -----------------------------------------------------------
+                S_FORMAT: begin
+                    // Linha 1: Opcode (Ex: "ADD             ")
+                    op_string = get_op_str(opcode_in);
+                    line_buffer[0] = op_string[39:32];
+                    line_buffer[1] = op_string[31:24];
+                    line_buffer[2] = op_string[23:16];
+                    line_buffer[3] = op_string[15:8];
+                    line_buffer[4] = op_string[7:0];
+                    for(i=5; i<16; i=i+1) line_buffer[i] = " "; // Preenche com espaços
+
+                    // Linha 2: "[BBBB] +DDDDD   "
+                    // Endereço Binário
+                    line_buffer[16] = "[";
+                    line_buffer[17] = reg_idx_in[3] ? "1" : "0";
+                    line_buffer[18] = reg_idx_in[2] ? "1" : "0";
+                    line_buffer[19] = reg_idx_in[1] ? "1" : "0";
+                    line_buffer[20] = reg_idx_in[0] ? "1" : "0";
+                    line_buffer[21] = "]";
+                    line_buffer[22] = " ";
+                    
+                    // Sinal e Valor Decimal
+                    if (value_in[15] == 1'b1) begin
+                        line_buffer[23] = "-";
+                        abs_val = -value_in;
+                    end else begin
+                        line_buffer[23] = "+";
+                        abs_val = value_in;
+                    end
+
+                    // Converte Binário para Dígitos ASCII
+                    ten_thou = (abs_val / 10000) % 10;
+                    thou     = (abs_val / 1000) % 10;
+                    hund     = (abs_val / 100) % 10;
+                    tens     = (abs_val / 10) % 10;
+                    ones     = abs_val % 10;
+
+                    line_buffer[24] = {4'b0011, ten_thou}; // + 0x30 para virar ASCII
+                    line_buffer[25] = {4'b0011, thou};
+                    line_buffer[26] = {4'b0011, hund};
+                    line_buffer[27] = {4'b0011, tens};
+                    line_buffer[28] = {4'b0011, ones};
+                    
+                    // Preenche o resto com espaço
+                    line_buffer[29] = " "; line_buffer[30] = " "; line_buffer[31] = " ";
+
+                    state <= S_CMD_CLEAR;
+                end
+
+                // -----------------------------------------------------------
+                // Estado: Limpar o LCD antes de escrever nova mensagem
+                // -----------------------------------------------------------
+                S_CMD_CLEAR: begin
+                    wr_rs   <= 0;    // Modo Comando
+                    wr_data <= 8'h01; // Comando Clear Display
+                    wr_e    <= 1;
+                    delay_cnt <= D_PULSE;
+                    state <= S_WAIT_CMD;
+                    char_ptr <= 0;   // Reseta ponteiro de caractere
+                end
+
+                S_WAIT_CMD: begin
+                    if (delay_cnt > 0) begin
+                        delay_cnt <= delay_cnt - 1;
+                        if (delay_cnt == D_PULSE/2) wr_e <= 0;
+                    end else begin
+                        delay_cnt <= D_CLEAR; // Espera o LCD limpar
+                        state <= S_WRITE_CHAR;
+                    end
+                end
+
+                // -----------------------------------------------------------
+                // Loop de Escrita: Varre o line_buffer[0..31]
+                // -----------------------------------------------------------
+                S_WRITE_CHAR: begin
+                     if (delay_cnt > 0) begin
+                        delay_cnt <= delay_cnt - 1;
+                     end else begin
+                        if (char_ptr < 32) begin
+                            // Se chegou no meio (16), precisa pular para linha 2
+                            if (char_ptr == 16 && wr_rs == 1) begin
+                                wr_rs <= 0;       // Comando
+                                wr_data <= 8'hC0; // Pula para Linha 2 (0x80 + 0x40)
+                                wr_e <= 1;
+                                delay_cnt <= D_PULSE;
+                                state <= S_PULSE_EN; // Vai gerar pulso, depois volta aqui
+                                // Nota: Não incrementa char_ptr aqui, pois ainda não escrevemos o char 16
+                            end else begin
+                                wr_rs <= 1;       // Dado
+                                wr_data <= line_buffer[char_ptr];
+                                wr_e <= 1;
+                                delay_cnt <= D_PULSE;
+                                char_ptr <= char_ptr + 1; // Próximo char
+                                state <= S_PULSE_EN;
+                            end
+                        end else begin
+                            state <= S_IDLE; // Acabou tudo
+                        end
+                     end
+                end
+
+                S_PULSE_EN: begin
+                    if (delay_cnt > 0) begin
+                        delay_cnt <= delay_cnt - 1;
+                        if (delay_cnt == D_PULSE/2) wr_e <= 0;
+                    end else begin
+                        delay_cnt <= D_CHAR;
+                        // Se acabamos de mandar o comando de pular linha (char_ptr==16 e rs estava 0),
+                        // precisamos voltar para mandar o dado.
+                        if (char_ptr == 16 && wr_rs == 0) begin
+                             wr_rs <= 1; // Prepara para dado na próxima
+                             state <= S_WRITE_CHAR; // Volta sem incrementar delay grande
+                        end else begin
+                             state <= S_WRITE_CHAR;
+                        end
+                    end
+                end
+            endcase
+        end
+    end
+
+endmodule
