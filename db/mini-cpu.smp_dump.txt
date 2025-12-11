@@ -26,9 +26,13 @@ state.S_WAIT 0 1 0 0 0 1
 state.S_DONE 1 0 0 0 0 1 
 
 State Machine - |DE2_115_Project_Top|module_mini_cpu:cpu|state
-Name state.S_UPDATE_LCD state.S_LATCH state.S_EXECUTE state.S_WAIT_BTN state.S_WAIT_LCD 
-state.S_WAIT_BTN 0 0 0 0 0 
-state.S_EXECUTE 0 0 1 1 0 
-state.S_LATCH 0 1 0 1 0 
-state.S_UPDATE_LCD 1 0 0 1 0 
-state.S_WAIT_LCD 0 0 0 1 1 
+Name state.S_UPDATE_LCD state.S_SHUTDOWN state.S_LATCH state.S_EXECUTE state.S_IDLE state.S_STARTUP state.S_WAIT_INIT state.S_OFF state.S_WAIT_LCD 
+state.S_OFF 0 0 0 0 0 0 0 0 0 
+state.S_WAIT_INIT 0 0 0 0 0 0 1 1 0 
+state.S_STARTUP 0 0 0 0 0 1 0 1 0 
+state.S_IDLE 0 0 0 0 1 0 0 1 0 
+state.S_EXECUTE 0 0 0 1 0 0 0 1 0 
+state.S_LATCH 0 0 1 0 0 0 0 1 0 
+state.S_SHUTDOWN 0 1 0 0 0 0 0 1 0 
+state.S_UPDATE_LCD 1 0 0 0 0 0 0 1 0 
+state.S_WAIT_LCD 0 0 0 0 0 0 0 1 1 

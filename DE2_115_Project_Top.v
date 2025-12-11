@@ -1,36 +1,44 @@
 module DE2_115_Project_Top (
     input  wire        CLOCK_50,
-    input  wire [3:0]  KEY,      // KEY[0]=Reset, KEY[1]=Send
+    input  wire [3:0]  KEY,      // KEY[0]=Power, KEY[1]=Send
     input  wire [17:0] SW,       // Instruções
-    // LCD Interface
     output wire [7:0]  LCD_DATA,
     output wire        LCD_RS,
     output wire        LCD_RW,
     output wire        LCD_EN,
-    output wire        LCD_ON,   // Liga backlight/power
+    output wire        LCD_ON,   
     output wire        LCD_BLON
 );
 
-    // Configurações fixas DE2-115
     assign LCD_ON   = 1'b1;
     assign LCD_BLON = 1'b1;
 
-    // Sinais de Conexão
     wire lcd_update_sig;
     wire [2:0] lcd_op;
     wire [3:0] lcd_reg;
     wire [15:0] lcd_val;
     wire lcd_is_busy;
     
-    // Inversão do Reset (Botão pressionado = 0, Lógica = 1)
-    wire sys_rst = !KEY[0];
+    wire sys_rst;          
+    wire show_splash_sig;  
+    wire force_blank_sig;  
+    
+    // Invertemos aqui: 
+    // Se apertar a tecla física (nível 0), btn torna-se 1.
+    // Se soltar a tecla física (nível 1), btn torna-se 0.
+    wire btn_power = !KEY[0];
+    wire btn_send  = !KEY[1];
 
-    // Instância da CPU
     module_mini_cpu cpu (
         .clk(CLOCK_50),
-        .rst(sys_rst),
-        .send_btn(KEY[1]), // Passamos direto, borda tratada dentro
+        .power_btn(btn_power),
+        .send_btn(btn_send),
         .switches(SW),
+        
+        .sys_rst_out(sys_rst),
+        .lcd_show_splash(show_splash_sig),
+        .lcd_force_blank(force_blank_sig),
+        
         .lcd_update(lcd_update_sig),
         .lcd_opcode(lcd_op),
         .lcd_reg_idx(lcd_reg),
@@ -38,11 +46,12 @@ module DE2_115_Project_Top (
         .lcd_busy(lcd_is_busy)
     );
 
-    // Instância do Controlador LCD
     lcd_custom_controller lcd_ctrl (
         .clk(CLOCK_50),
-        .rst(sys_rst),
+        .rst(sys_rst),         
         .update_req(lcd_update_sig),
+        .show_splash(show_splash_sig),
+        .force_blank(force_blank_sig),
         .opcode_in(lcd_op),
         .reg_idx_in(lcd_reg),
         .value_in(lcd_val),

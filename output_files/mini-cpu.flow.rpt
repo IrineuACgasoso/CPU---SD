@@ -1,6 +1,6 @@
 Flow report for mini-cpu
-Wed Dec 10 18:01:43 2025
-Quartus Prime Version 21.1.1 Build 850 06/23/2022 SJ Lite Edition
+Thu Dec 11 05:09:51 2025
+Quartus Prime Version 17.1.0 Build 590 10/25/2017 SJ Lite Edition
 
 
 ---------------------
@@ -21,9 +21,9 @@ Quartus Prime Version 21.1.1 Build 850 06/23/2022 SJ Lite Edition
 ----------------
 ; Legal Notice ;
 ----------------
-Copyright (C) 2022  Intel Corporation. All rights reserved.
+Copyright (C) 2017  Intel Corporation. All rights reserved.
 Your use of Intel Corporation's design tools, logic functions 
-and other software and tools, and any partner logic 
+and other software and tools, and its AMPP partner logic 
 functions, and any output files from any of the foregoing 
 (including device programming or simulation files), and any 
 associated documentation or information are expressly subject 
@@ -33,25 +33,24 @@ the Intel FPGA IP License Agreement, or other applicable license
 agreement, including, without limitation, that your use is for
 the sole purpose of programming logic devices manufactured by
 Intel and sold by Intel or its authorized distributors.  Please
-refer to the applicable agreement for further details, at
-https://fpgasoftware.intel.com/eula.
+refer to the applicable agreement for further details.
 
 
 
 +----------------------------------------------------------------------------------+
 ; Flow Summary                                                                     ;
 +------------------------------------+---------------------------------------------+
-; Flow Status                        ; Successful - Wed Dec 10 18:01:43 2025       ;
-; Quartus Prime Version              ; 21.1.1 Build 850 06/23/2022 SJ Lite Edition ;
+; Flow Status                        ; Successful - Thu Dec 11 05:09:51 2025       ;
+; Quartus Prime Version              ; 17.1.0 Build 590 10/25/2017 SJ Lite Edition ;
 ; Revision Name                      ; mini-cpu                                    ;
 ; Top-level Entity Name              ; DE2_115_Project_Top                         ;
 ; Family                             ; Cyclone IV E                                ;
 ; Device                             ; EP4CE115F29C7                               ;
 ; Timing Models                      ; Final                                       ;
-; Total logic elements               ; 1,916 / 114,480 ( 2 % )                     ;
-;     Total combinational functions  ; 1,890 / 114,480 ( 2 % )                     ;
-;     Dedicated logic registers      ; 481 / 114,480 ( < 1 % )                     ;
-; Total registers                    ; 481                                         ;
+; Total logic elements               ; 1,998 / 114,480 ( 2 % )                     ;
+;     Total combinational functions  ; 1,958 / 114,480 ( 2 % )                     ;
+;     Dedicated logic registers      ; 505 / 114,480 ( < 1 % )                     ;
+; Total registers                    ; 505                                         ;
 ; Total pins                         ; 36 / 529 ( 7 % )                            ;
 ; Total virtual pins                 ; 0                                           ;
 ; Total memory bits                  ; 0 / 3,981,312 ( 0 % )                       ;
@@ -65,7 +64,7 @@ https://fpgasoftware.intel.com/eula.
 +-------------------+---------------------+
 ; Option            ; Setting             ;
 +-------------------+---------------------+
-; Start date & time ; 12/10/2025 18:01:00 ;
+; Start date & time ; 12/11/2025 05:09:14 ;
 ; Main task         ; Compilation         ;
 ; Revision Name     ; mini-cpu            ;
 +-------------------+---------------------+
@@ -76,7 +75,7 @@ https://fpgasoftware.intel.com/eula.
 +-------------------------------------+----------------------------------------+---------------+---------------------+-----------------------------------+
 ; Assignment Name                     ; Value                                  ; Default Value ; Entity Name         ; Section Id                        ;
 +-------------------------------------+----------------------------------------+---------------+---------------------+-----------------------------------+
-; COMPILER_SIGNATURE_ID               ; 238368719731900.176540046012744        ; --            ; --                  ; --                                ;
+; COMPILER_SIGNATURE_ID               ; 238368719731847.176544055413916        ; --            ; --                  ; --                                ;
 ; EDA_GENERATE_FUNCTIONAL_NETLIST     ; Off                                    ; --            ; --                  ; eda_board_design_timing           ;
 ; EDA_GENERATE_FUNCTIONAL_NETLIST     ; Off                                    ; --            ; --                  ; eda_board_design_boundary_scan    ;
 ; EDA_GENERATE_FUNCTIONAL_NETLIST     ; Off                                    ; --            ; --                  ; eda_board_design_signal_integrity ;
@@ -90,36 +89,38 @@ https://fpgasoftware.intel.com/eula.
 ; PARTITION_COLOR                     ; -- (Not supported for targeted family) ; --            ; DE2_115_Project_Top ; Top                               ;
 ; PARTITION_FITTER_PRESERVATION_LEVEL ; -- (Not supported for targeted family) ; --            ; DE2_115_Project_Top ; Top                               ;
 ; PARTITION_NETLIST_TYPE              ; -- (Not supported for targeted family) ; --            ; DE2_115_Project_Top ; Top                               ;
+; POWER_BOARD_THERMAL_MODEL           ; None (CONSERVATIVE)                    ; --            ; --                  ; --                                ;
+; POWER_PRESET_COOLING_SOLUTION       ; 23 MM HEAT SINK WITH 200 LFPM AIRFLOW  ; --            ; --                  ; --                                ;
 ; PROJECT_OUTPUT_DIRECTORY            ; output_files                           ; --            ; --                  ; --                                ;
 ; TOP_LEVEL_ENTITY                    ; DE2_115_Project_Top                    ; mini-cpu      ; --                  ; --                                ;
 +-------------------------------------+----------------------------------------+---------------+---------------------+-----------------------------------+
 
 
-+--------------------------------------------------------------------------------------------------------------------------+
-; Flow Elapsed Time                                                                                                        ;
-+----------------------+--------------+-------------------------+---------------------+------------------------------------+
-; Module Name          ; Elapsed Time ; Average Processors Used ; Peak Virtual Memory ; Total CPU Time (on all processors) ;
-+----------------------+--------------+-------------------------+---------------------+------------------------------------+
-; Analysis & Synthesis ; 00:00:11     ; 1.0                     ; 4890 MB             ; 00:00:10                           ;
-; Fitter               ; 00:00:18     ; 1.1                     ; 6773 MB             ; 00:00:15                           ;
-; Assembler            ; 00:00:05     ; 1.0                     ; 4738 MB             ; 00:00:02                           ;
-; Timing Analyzer      ; 00:00:05     ; 1.5                     ; 5033 MB             ; 00:00:01                           ;
-; EDA Netlist Writer   ; 00:00:04     ; 1.0                     ; 4679 MB             ; 00:00:01                           ;
-; Total                ; 00:00:43     ; --                      ; --                  ; 00:00:29                           ;
-+----------------------+--------------+-------------------------+---------------------+------------------------------------+
++-------------------------------------------------------------------------------------------------------------------------------+
+; Flow Elapsed Time                                                                                                             ;
++---------------------------+--------------+-------------------------+---------------------+------------------------------------+
+; Module Name               ; Elapsed Time ; Average Processors Used ; Peak Virtual Memory ; Total CPU Time (on all processors) ;
++---------------------------+--------------+-------------------------+---------------------+------------------------------------+
+; Analysis & Synthesis      ; 00:00:11     ; 1.0                     ; 4880 MB             ; 00:00:09                           ;
+; Fitter                    ; 00:00:16     ; 1.2                     ; 6766 MB             ; 00:00:14                           ;
+; Assembler                 ; 00:00:02     ; 1.0                     ; 4693 MB             ; 00:00:02                           ;
+; TimeQuest Timing Analyzer ; 00:00:02     ; 1.5                     ; 5013 MB             ; 00:00:01                           ;
+; EDA Netlist Writer        ; 00:00:02     ; 1.0                     ; 4678 MB             ; 00:00:02                           ;
+; Total                     ; 00:00:33     ; --                      ; --                  ; 00:00:28                           ;
++---------------------------+--------------+-------------------------+---------------------+------------------------------------+
 
 
-+------------------------------------------------------------------------------------+
-; Flow OS Summary                                                                    ;
-+----------------------+------------------+------------+------------+----------------+
-; Module Name          ; Machine Hostname ; OS Name    ; OS Version ; Processor type ;
-+----------------------+------------------+------------+------------+----------------+
-; Analysis & Synthesis ; HWC18            ; Windows 10 ; 10.0       ; x86_64         ;
-; Fitter               ; HWC18            ; Windows 10 ; 10.0       ; x86_64         ;
-; Assembler            ; HWC18            ; Windows 10 ; 10.0       ; x86_64         ;
-; Timing Analyzer      ; HWC18            ; Windows 10 ; 10.0       ; x86_64         ;
-; EDA Netlist Writer   ; HWC18            ; Windows 10 ; 10.0       ; x86_64         ;
-+----------------------+------------------+------------+------------+----------------+
++-----------------------------------------------------------------------------------------+
+; Flow OS Summary                                                                         ;
++---------------------------+------------------+------------+------------+----------------+
+; Module Name               ; Machine Hostname ; OS Name    ; OS Version ; Processor type ;
++---------------------------+------------------+------------+------------+----------------+
+; Analysis & Synthesis      ; HWC21            ; Windows 10 ; 10.0       ; x86_64         ;
+; Fitter                    ; HWC21            ; Windows 10 ; 10.0       ; x86_64         ;
+; Assembler                 ; HWC21            ; Windows 10 ; 10.0       ; x86_64         ;
+; TimeQuest Timing Analyzer ; HWC21            ; Windows 10 ; 10.0       ; x86_64         ;
+; EDA Netlist Writer        ; HWC21            ; Windows 10 ; 10.0       ; x86_64         ;
++---------------------------+------------------+------------+------------+----------------+
 
 
 ------------

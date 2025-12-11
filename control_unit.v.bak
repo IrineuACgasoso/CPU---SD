@@ -1,0 +1,248 @@
+`define POSITIVE 0
+`define ZERO 0
+`define DISABLE 0
+`define ENABLE 1
+
+// botoes são ativados no 0
+
+module control_unit (
+    input wire          clk,
+    input wire          rst,
+    input wire          send,
+    input wire          LCD_done,   // sinal para saber se o LCD está pronto.
+    input wire          store_done,  // sinal para saber se ja fez load/display
+    input wire [17:0]   switches,
+    
+    output reg [3:0]    DEST;
+    output reg [3:0]    SRC1;
+    output reg [3:0]    SRC2;
+    output reg          IMM_SIGN;
+    output reg [5:0]    IMM_MAGNETUDE;
+    
+    output reg [2:0]    alu_func;
+    output reg          alu_enable;
+    output reg          read_enable;
+    output reg          write_enable; 
+    output reg          clear_mem;
+);  
+    // Estados
+    parameter [3:0]
+        BUTTON_OFF  = 4'b0000,
+        BUTTON_ON   = 4'b0001,
+        BUTTON_SEND = 4'b0010,
+        OFF         = 4'b0011,
+        INIT        = 4'b0100,
+        IDLE        = 4'b0101,
+        DECODE      = 4'b0110,
+        EXECUTE     = 4'b0111,
+        STORE       = 4'b1000;
+    
+    // Opcodes
+    parameter [2:0]
+        LOAD = 3'b000,
+        ADD = 3'b001,
+        ADDI = 3'b010,
+        SUB = 3'b011,
+        SUBI = 3'b100,
+        MUL = 3'b101,
+        CLEAR = 3'b110,
+        DISPLAY = 3'b111;
+
+    // Sinal dos botões de ligar e enviar
+    wire pulse_on_off;
+    wire pulse_send;
+
+    debounce inst0 (.clk(clk), .button_in(rst), .button_pulse(pulse_on_off));
+    debounce inst1 (.clk(clk), .button_in(send), .button_pulse(pulse_send));
+
+    // Registradores de estados
+    reg [3:0] current_state;
+    reg [3:0] next_state;
+
+    // Registradores de Decodificação e Controle
+    reg [3:0] DEST;
+    reg [3:0] SRC1;
+    reg [3:0] SRC2;
+    reg IMM_SIGN;
+    reg [5:0] IMM_MAGNETUDE;
+    reg [2:0] alu_func;
+
+    reg alu_enable;
+    reg read_enable;
+    reg write_enable; 
+    reg clear_mem;
+    
+    always @(posedge clk) begin
+        current_state <= next_state;
+    end
+
+    always @(*) begin
+        next_state = current_state;
+
+        case (current_state)
+            BUTTON_OFF: begin
+                if (pulse_on_off)
+                    next_state = OFF;
+            end
+
+            BUTTON_ON: begin
+                if (pulse_on_off)
+                    next_state = INIT;
+            end
+            
+            BUTTON_SEND: begin
+                if (pulse_send)
+                    next_state = DECODE;
+            end
+
+            OFF: begin
+                if (~rst)
+                    next_state = BUTTON_ON;
+            end
+            
+            INIT: begin
+            // logica para esperar o tempo de inicialização do LCD (?)
+            if (LCD_done) // sinal recebido pela control unit;
+                next_state = IDLE;
+            end
+
+            IDLE: begin
+                if (~send)
+                    next_state = BUTTON_SEND;
+                else if (~rst)
+                    next_state = BUTTON_OFF;
+            end
+
+            DECODE: begin
+                DEST           = ZERO;
+                SRC1           = ZERO;
+                SRC2           = ZERO;
+                IMM_SIGN       = POSITIVE;
+                IMM_MAGNETUDE  = ZERO;
+                alu_func       = ZERO;
+                
+                // Prioridade 1: Tipo 2 - Operações aritméticas com imediatos
+                if (switches[17:15] == ADDI || switches[17:15] == SUBI || switches[17:15] == MUL) begin
+                    DEST           = switches[14:11]; 
+                    SRC1           = switches[10:7];  
+                    IMM_SIGN       = switches[6];     
+                    IMM_MAGNETUDE  = switches[5:0];
+
+                    case (switches[17:15])
+                        ADDI: alu_func = ADDI;
+                        SUBI: alu_func = SUBI;
+                        MUL:  alu_func = MUL;
+                    endcase
+                end 
+
+                // Prioridade 2: Tipo 1 - Operações aritméticas com registradores
+                else if (switches[14:12] == ADD || switches[14:12] == SUB) begin
+                    DEST = switches[11:8];
+                    SRC1 = switches[7:4];
+                    SRC2 = switches[3:0];
+                    
+                    case (switches[14:12])
+                        ADD: alu_func = ADD;
+                        SUB: alu_func = SUB;
+                    endcase
+                end
+
+                // Prioridade 3: Tipo 3 - Operação de Carga
+                else if (switches[13:11] == LOAD) begin
+                    DEST          = switches[10:7];
+                    IMM_SIGN      = switches[6];
+                    IMM_MAGNETUDE = switches[5:0];
+
+                    alu_func = LOAD;
+                end
+
+                // Prioridade 4: Tipo especial - Controle e saída
+                else if (switches[7:4] == CLEAR || switches[7:4] == DISPLAY) begin
+                    SRC1 = switches[3:0];
+        
+                    case (switches[7:4])
+                        CLEAR:   alu_func = CLEAR;
+                        DISPLAY: alu_func = DISPLAY;
+                    endcase
+                end
+
+                next_state = EXECUTE;
+            end
+
+            EXECUTE: begin
+                alu_enable   = DISABLE;
+                read_enable  = DISABLE;
+                write_enable = DISABLE;
+                clear_mem    = DISABLE;
+
+                if (alu_func == ADD  || alu_func == SUB || alu_func == MUL || 
+                    alu_func == ADDI || alu_func == SUBI) begin
+                        alu_enable = ENABLE;
+                        read_enable = ENABLE;
+                        write_enable = ENABLE;               
+                end
+
+                else if (alu_func == LOAD)
+                    write_enable = ENABLE;
+
+                else if (alu_func == CLEAR)
+                    clear_mem = ENABLE;
+                
+                else if (alu_func == DISPLAY)
+                    read_enable = ENABLE;
+
+                next_state = STORE;
+            end
+
+            STORE: begin
+            // Esperar o tempo de escrita no LCD/Memória. // como receber isso?
+            if (store_done) // Sinal de conclusão da escrita/saída
+                next_state = IDLE;
+            end
+
+            default: next_state = OFF;
+        endcase
+    end
+endmodule
+
+module debounce (
+    input wire clk,
+    input wire button_in,
+    output wire button_pulse
+);
+    parameter COUNTER_MAX = 50000;
+
+    reg [15:0] count; // ja começa com valor 0?
+    reg button_synced;
+
+    always @(posedge CLK) begin
+        if (button_in != button_synced) begin // sinal muda
+            if (count == COUNTER_MAX - 1) begin // se passar 1ms
+                button_synced <= button_in;
+                count <= 0;
+            end
+            
+            else begin
+                count <= count + 1;
+            end
+        end
+
+        else begin
+            count <= 0;
+        end
+    end
+
+    reg button_synced_prev;
+    
+    always @(posedge CLK) begin
+        button_synced_prev <= button_synced;
+    end
+    
+    /*
+    O pulso é gerado quando:
+    - O sinal sincronizado estava em '0' (pressionado)
+    - E no próximo ciclo ele vai para '1' (solto)
+    - E o sinal anterior sincronizado estava em '0' (garante o pulso único)
+    */
+    assign button_pulse = (button_synced == 1'b1) && (button_synced_prev == 1'b0);
+endmodule
