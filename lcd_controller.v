@@ -32,7 +32,6 @@ module lcd_controller (
     );
 
     // --- Multiplexador de Saída (Init vs Escrita) ---
-    // CORREÇÃO: Declaramos como write_data_bus
     reg [7:0] write_data_bus;
     reg write_rs, write_e;
     
@@ -128,7 +127,7 @@ module lcd_controller (
                         for(i=27; i<32; i=i+1) lcd_buffer[i] = "0";
                     end 
                     
-                    // CASO 3: Instrução CLEAR (Só Texto)
+                    // CASO 3: Instrução CLEAR
                     else if (instruction_opcode == 3'b110) begin 
                         current_op_str = get_opcode_string(instruction_opcode); 
                         {lcd_buffer[0], lcd_buffer[1], lcd_buffer[2], lcd_buffer[3], lcd_buffer[4]} = current_op_str;
@@ -176,7 +175,7 @@ module lcd_controller (
                 
                 // --- Sequência de Escrita no LCD ---
                 S_CMD_CLEAR: begin 
-                    write_rs <= 0; write_data_bus <= 8'h01; write_e <= 1; // CORRIGIDO PARA write_data_bus
+                    write_rs <= 0; write_data_bus <= 8'h01; write_e <= 1;
                     delay_counter <= DELAY_PULSE; state <= S_WAIT_CLEAR; 
                 end
                 
@@ -189,7 +188,7 @@ module lcd_controller (
                     if (delay_counter > 0) delay_counter <= delay_counter - 1; 
                     else begin 
                         if (char_pointer < 16) begin 
-                            write_rs <= 1; write_data_bus <= lcd_buffer[char_pointer]; // CORRIGIDO PARA write_data_bus
+                            write_rs <= 1; write_data_bus <= lcd_buffer[char_pointer];
                             write_e <= 1; delay_counter <= DELAY_CHAR; 
                             char_pointer <= char_pointer + 1; 
                             return_state <= S_WRITE_LINE1; state <= S_PULSE_EN; 
@@ -198,7 +197,7 @@ module lcd_controller (
                 end
                 
                 S_CMD_NEWLINE: begin 
-                    write_rs <= 0; write_data_bus <= 8'hC0; write_e <= 1; // CORRIGIDO PARA write_data_bus
+                    write_rs <= 0; write_data_bus <= 8'hC0; write_e <= 1;
                     delay_counter <= DELAY_PULSE; state <= S_WAIT_NEWLINE; 
                 end
                 
@@ -211,7 +210,7 @@ module lcd_controller (
                     if (delay_counter > 0) delay_counter <= delay_counter - 1; 
                     else begin 
                         if (char_pointer < 32) begin 
-                            write_rs <= 1; write_data_bus <= lcd_buffer[char_pointer]; // CORRIGIDO PARA write_data_bus
+                            write_rs <= 1; write_data_bus <= lcd_buffer[char_pointer];
                             write_e <= 1; delay_counter <= DELAY_CHAR; 
                             char_pointer <= char_pointer + 1; 
                             return_state <= S_WRITE_LINE2; state <= S_PULSE_EN; 
