@@ -1,10 +1,10 @@
-Analysis & Synthesis Status : Successful - Thu Dec 11 05:09:24 2025
+Analysis & Synthesis Status : Successful - Thu Dec 11 08:04:00 2025
 Quartus Prime Version : 17.1.0 Build 590 10/25/2017 SJ Lite Edition
 Revision Name : mini-cpu
 Top-level Entity Name : DE2_115_Project_Top
 Family : Cyclone IV E
-Total logic elements : 2,223
-    Total combinational functions : 1,958
+Total logic elements : 2,229
+    Total combinational functions : 1,964
     Dedicated logic registers : 505
 Total registers : 505
 Total pins : 36

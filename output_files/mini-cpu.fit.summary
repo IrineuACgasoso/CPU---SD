@@ -1,12 +1,12 @@
-Fitter Status : Successful - Thu Dec 11 05:09:41 2025
+Fitter Status : Successful - Thu Dec 11 08:04:17 2025
 Quartus Prime Version : 17.1.0 Build 590 10/25/2017 SJ Lite Edition
 Revision Name : mini-cpu
 Top-level Entity Name : DE2_115_Project_Top
 Family : Cyclone IV E
 Device : EP4CE115F29C7
 Timing Models : Final
-Total logic elements : 1,998 / 114,480 ( 2 % )
-    Total combinational functions : 1,958 / 114,480 ( 2 % )
+Total logic elements : 1,992 / 114,480 ( 2 % )
+    Total combinational functions : 1,964 / 114,480 ( 2 % )
     Dedicated logic registers : 505 / 114,480 ( < 1 % )
 Total registers : 505
 Total pins : 36 / 529 ( 7 % )

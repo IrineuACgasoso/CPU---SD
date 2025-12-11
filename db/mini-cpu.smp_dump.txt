@@ -1,22 +1,22 @@
 
-State Machine - |DE2_115_Project_Top|lcd_custom_controller:lcd_ctrl|return_state
-Name return_state.S_WRITE_L2 
-return_state.S_WRITE_L1 0 
-return_state.S_WRITE_L2 1 
+State Machine - |DE2_115_Project_Top|lcd_controller:display_ctrl|return_state
+Name return_state.S_WRITE_LINE2 
+return_state.S_WRITE_LINE1 0 
+return_state.S_WRITE_LINE2 1 
 
-State Machine - |DE2_115_Project_Top|lcd_custom_controller:lcd_ctrl|state
-Name state.S_WRITE_L2 state.S_WAIT_NEWLINE state.S_CMD_NEWLINE state.S_WRITE_L1 state.S_WAIT_CLEAR state.S_CMD_CLEAR state.S_FORMAT state.S_IDLE state.S_PULSE 
+State Machine - |DE2_115_Project_Top|lcd_controller:display_ctrl|state
+Name state.S_WRITE_LINE2 state.S_WAIT_NEWLINE state.S_CMD_NEWLINE state.S_WRITE_LINE1 state.S_WAIT_CLEAR state.S_CMD_CLEAR state.S_FORMAT_TEXT state.S_IDLE state.S_PULSE_EN 
 state.S_IDLE 0 0 0 0 0 0 0 0 0 
-state.S_FORMAT 0 0 0 0 0 0 1 1 0 
+state.S_FORMAT_TEXT 0 0 0 0 0 0 1 1 0 
 state.S_CMD_CLEAR 0 0 0 0 0 1 0 1 0 
 state.S_WAIT_CLEAR 0 0 0 0 1 0 0 1 0 
-state.S_WRITE_L1 0 0 0 1 0 0 0 1 0 
+state.S_WRITE_LINE1 0 0 0 1 0 0 0 1 0 
 state.S_CMD_NEWLINE 0 0 1 0 0 0 0 1 0 
 state.S_WAIT_NEWLINE 0 1 0 0 0 0 0 1 0 
-state.S_WRITE_L2 1 0 0 0 0 0 0 1 0 
-state.S_PULSE 0 0 0 0 0 0 0 1 1 
+state.S_WRITE_LINE2 1 0 0 0 0 0 0 1 0 
+state.S_PULSE_EN 0 0 0 0 0 0 0 1 1 
 
-State Machine - |DE2_115_Project_Top|lcd_custom_controller:lcd_ctrl|lcd_init_hd44780:lcd_init_inst|state
+State Machine - |DE2_115_Project_Top|lcd_controller:display_ctrl|lcd_init_hd44780:lcd_init_inst|state
 Name state.S_DONE state.S_WAIT state.S_PULSE state.S_SETUP state.S_POWER_WAIT state.S_IDLE 
 state.S_IDLE 0 0 0 0 0 0 
 state.S_POWER_WAIT 0 0 0 0 1 1 
@@ -25,14 +25,14 @@ state.S_PULSE 0 0 1 0 0 1
 state.S_WAIT 0 1 0 0 0 1 
 state.S_DONE 1 0 0 0 0 1 
 
-State Machine - |DE2_115_Project_Top|module_mini_cpu:cpu|state
-Name state.S_UPDATE_LCD state.S_SHUTDOWN state.S_LATCH state.S_EXECUTE state.S_IDLE state.S_STARTUP state.S_WAIT_INIT state.S_OFF state.S_WAIT_LCD 
-state.S_OFF 0 0 0 0 0 0 0 0 0 
-state.S_WAIT_INIT 0 0 0 0 0 0 1 1 0 
-state.S_STARTUP 0 0 0 0 0 1 0 1 0 
-state.S_IDLE 0 0 0 0 1 0 0 1 0 
-state.S_EXECUTE 0 0 0 1 0 0 0 1 0 
-state.S_LATCH 0 0 1 0 0 0 0 1 0 
-state.S_SHUTDOWN 0 1 0 0 0 0 0 1 0 
-state.S_UPDATE_LCD 1 0 0 0 0 0 0 1 0 
-state.S_WAIT_LCD 0 0 0 0 0 0 0 1 1 
+State Machine - |DE2_115_Project_Top|module_mini_cpu:cpu|current_state
+Name current_state.STATE_UPDATE_LCD current_state.STATE_SHUTDOWN current_state.STATE_LATCH current_state.STATE_EXECUTE current_state.STATE_IDLE current_state.STATE_SPLASH current_state.STATE_WAIT_BOOT current_state.STATE_OFF current_state.STATE_WAIT_LCD 
+current_state.STATE_OFF 0 0 0 0 0 0 0 0 0 
+current_state.STATE_WAIT_BOOT 0 0 0 0 0 0 1 1 0 
+current_state.STATE_SPLASH 0 0 0 0 0 1 0 1 0 
+current_state.STATE_IDLE 0 0 0 0 1 0 0 1 0 
+current_state.STATE_EXECUTE 0 0 0 1 0 0 0 1 0 
+current_state.STATE_LATCH 0 0 1 0 0 0 0 1 0 
+current_state.STATE_SHUTDOWN 0 1 0 0 0 0 0 1 0 
+current_state.STATE_UPDATE_LCD 1 0 0 0 0 0 0 1 0 
+current_state.STATE_WAIT_LCD 0 0 0 0 0 0 0 1 1 

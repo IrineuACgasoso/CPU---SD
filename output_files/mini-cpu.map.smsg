@@ -1,1 +1,1 @@
-Warning (10268): Verilog HDL information at lcd_custom_controller.v(75): always construct contains both blocking and non-blocking assignments File: D:/Users/rabs4/Documents/CPU---SD/lcd_custom_controller.v Line: 75
+Warning (10268): Verilog HDL information at lcd_controller.v(86): always construct contains both blocking and non-blocking assignments File: D:/Users/rabs4/Documents/CPU---SD/lcd_controller.v Line: 86
